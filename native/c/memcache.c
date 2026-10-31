@@ -137,11 +137,18 @@ void cache_store(Cache *c, uint32_t addr, uint32_t width, uint64_t val) {
     for (uint32_t i = 0; i < width; i++) {
         *p++ = (uint8_t)(val >> (8u * i));
     }
-    /* write-through, write-allocate: the slot holds the aligned word */
-    uint32_t tag  = addr >> WORD_SHIFT;
-    uint32_t slot = tag & (CACHE_SLOTS - 1);
-    *word_at(c, slot) = backing_word(c, addr);
-    *tag_at(c, slot) = tag + 1u;
+    /* write-through, write-allocate: every word the store touches
+       gets its slot refreshed, including the second word of a
+       boundary-crossing store */
+    uint32_t firstWord = addr & ~7u;
+    uint32_t lastWord  = (addr + width - 1u) & ~7u;
+    for (uint32_t waddr = firstWord; ; waddr += 8u) {
+        uint32_t tag  = waddr >> WORD_SHIFT;
+        uint32_t slot = tag & (CACHE_SLOTS - 1);
+        *word_at(c, slot) = backing_word(c, waddr);
+        *tag_at(c, slot) = tag + 1u;
+        if (waddr == lastWord) break;
+    }
 }
 
 void cache_destroy(Cache *c) { free(c->mem); free(c); }

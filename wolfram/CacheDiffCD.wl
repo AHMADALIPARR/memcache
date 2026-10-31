@@ -4,6 +4,8 @@
    Replays trace.jsonl over the mem.bin image in Wolfram and compares
    against the C replay's results_replay.jsonl and final.bin. *)
 dir = "/home/hatch/workspace/ghost/native/c/run2";
+readBytes[path_] := Module[{st = OpenRead[path, BinaryFormat -> True], data},
+  data = Table[Read[st, Byte], {1024}]; Close[st]; data];
 num[line_, key_] := Module[{p, rest, chars, out = ""},
   p = StringPosition[line, "\"" <> key <> "\":"];
   If[p === {}, Return[0]];
@@ -21,10 +23,10 @@ parseLine[line_] :=
       "Width" -> num[line, "Width"]|>];
 readLines[f_] := Select[StringSplit[Import[f, "Text"], "\n"], # != "" &];
 
-m = BinaryReadList[dir <> "/mem.bin"];
+m = readBytes[dir <> "/mem.bin"];
 traceC = parseLine /@ readLines[dir <> "/trace.jsonl"];
 resultsC = num[#, "Value"] & /@ readLines[dir <> "/results_replay.jsonl"];
-finalC = BinaryReadList[dir <> "/final.bin"];
+finalC = readBytes[dir <> "/final.bin"];
 Print["read: trace ", Length[traceC], ", results ", Length[resultsC]];
 
 li = 0; mism = {};
@@ -37,7 +39,7 @@ Do[
       mism = Join[mism, {<|"Load#" -> li, "Addr" -> t["Addr"],
         "Width" -> t["Width"], "Wolfram" -> v, "C" -> resultsC[[li]]|>}]],
     t["Op"] === "Store",
-    Do[m[[t["Addr"] + i]] = BitAnd[BitShiftRight[t["Val"], 8 (i - 1)], 255],
+    Do[m[[t["Addr"] + i]] = Mod[Quotient[t["Val"], 2^(8 (i - 1))], 256],
       {i, t["Width"]}]],
   {t, traceC}];
 Print["C loads compared: ", li, ", mismatches: ", Length[mism]];

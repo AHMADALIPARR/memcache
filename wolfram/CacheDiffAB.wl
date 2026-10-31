@@ -4,11 +4,27 @@
    JSONL parsed with Wolfram string patterns (Mathics3's JSON importer
    fails on these records; RegularExpression rule-delayed forms are
    avoided for the same reason). *)
-XorShift32[x_] := Module[{y = BitAnd[BitXor[x, BitShiftLeft[x, 13]], 2^32 - 1]},
-  y = BitAnd[BitXor[y, BitShiftRight[y, 17]], 2^32 - 1];
-  BitAnd[BitXor[y, BitShiftLeft[y, 5]], 2^32 - 1]];
+(* Arithmetic bit primitives: Mathics3 in this environment evaluates
+   none of BitAnd/BitOr/BitXor/BitShiftLeft/BitShiftRight (they stay
+   symbolic), so the differential expresses the same operations with
+   Quotient/Mod/powers of two, which do evaluate. The recurrences are
+   unchanged; only the primitives are substituted. *)
+shr[v_, n_] := Quotient[v, 2^n];
+shl[v_, n_] := v * 2^n;
+mask32[v_] := Mod[v, 2^32];
+xor32[a_, b_] := Module[{r = 0, p = 1, aa = a, bb = b},
+  While[aa > 0 || bb > 0,
+    r += p * Abs[Mod[aa, 2] - Mod[bb, 2]];
+    aa = Quotient[aa, 2]; bb = Quotient[bb, 2]; p *= 2];
+  r];
+XorShift32A[x_] := Module[{y},
+  y = mask32[xor32[x, shl[x, 13]]];
+  y = mask32[xor32[y, shr[y, 17]]];
+  mask32[xor32[y, shl[y, 5]]]];
 
 dir = "/home/hatch/workspace/ghost/native/c/run2";
+readBytes[path_] := Module[{st = OpenRead[path, BinaryFormat -> True], data},
+  data = Table[Read[st, Byte], {1024}]; Close[st]; data];
 num[line_, key_] := Module[{p, rest, chars, out = ""},
   p = StringPosition[line, "\"" <> key <> "\":"];
   If[p === {}, Return[0]];
@@ -26,21 +42,21 @@ parseLine[line_] :=
       "Width" -> num[line, "Width"]|>];
 readLines[f_] := Select[StringSplit[Import[f, "Text"], "\n"], # != "" &];
 
-imageC = BinaryReadList[dir <> "/mem.bin"];
+imageC = readBytes[dir <> "/mem.bin"];
 traceC = parseLine /@ readLines[dir <> "/trace.jsonl"];
 Print["trace parsed: ", Length[traceC]];
 
 s = 20261031;
-next[] := (s = XorShift32[s]);
-imageW = Table[BitAnd[next[], 255], {1024}];
+next[] := (s = XorShift32A[s]);
+imageW = Table[Mod[next[], 256], {1024}];
 Print["B initial-memory-equal: ", imageW === imageC];
 traceW = Table[
   Module[{a = Mod[next[], 1016], w = 2^Mod[next[], 3], op = Mod[next[], 3]},
     If[op < 2,
       <|"Op" -> "Load", "Addr" -> a, "Width" -> w|>,
-      Module[{v = BitOr[BitShiftLeft[next[], 32], next[]]},
+      Module[{v = shl[next[], 32] + next[]},
         <|"Op" -> "Store", "Addr" -> a, "Width" -> w,
-          "Val" -> BitAnd[v, 2^(8 w) - 1]|>]]],
+          "Val" -> Mod[v, 2^(8 w)]|>]]],
   {500}];
 opMismatch = Count[Table[traceW[[i]] =!= traceC[[i]], {i, 500}], True];
 Print["A prng-stream trace ops compared: 500, mismatches: ", opMismatch];

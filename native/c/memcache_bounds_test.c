@@ -1,4 +1,3 @@
-/* Copyright (c) 2026 Nova Parr, Ahmad Ali Parr, and Team HoloTwinKitty */
 /* Boundary regression + exhaustive access-contract tests (Directive 003
  * sections 3 and 5, C side). Includes memcache.c to reach range_valid.
  * Prints one line per failure and a summary; exit code = failures != 0. */
@@ -66,6 +65,13 @@ static void value_semantics(void) {
     cache_store(c, 4, 4, 0x11223344ULL);
     cache_store(c, 8, 4, 0x55667788ULL);
     CHECK(cache_load(c, 6, 4) == 0x77881122ULL, "word-crossing load is exact");
+    /* regression: fill the second word's slot, then a store crossing
+       into it from the first word must refresh that slot too */
+    cache_store(c, 16, 4, 0xA1A2A3A4ULL);
+    CHECK(cache_load(c, 18, 1) == 0xA2ULL, "second word slot filled");
+    cache_store(c, 14, 4, 0x0B0C0D0EULL);   /* bytes 14..17, crosses into word 16 */
+    CHECK(cache_load(c, 16, 2) == 0x0B0CULL, "crossing store refreshes second word slot");
+    CHECK(cache_load(c, 17, 1) == 0x0BULL, "crossed byte reads back through the slot");
     CHECK(c->errors == 0, "no rejections in value semantics");
     cache_destroy(c);
 }
