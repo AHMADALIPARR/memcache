@@ -11,13 +11,13 @@ A byte-addressable memory cache in C11 with a Wolfram Language reference model a
 
 ## System map
 
-![memcache system map](docs/images/system-map.svg)
+![memcache system map](https://raw.githubusercontent.com/AHMADALIPARR/memcache/main/docs/images/system-map.svg)
 
 ---
 
 ## Data path
 
-![Load and store data path](docs/images/data-path.svg)
+![Load and store data path](https://raw.githubusercontent.com/AHMADALIPARR/memcache/main/docs/images/data-path.svg)
 
 ```mermaid
 flowchart LR
