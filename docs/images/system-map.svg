@@ -1,47 +1,102 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="ui-sans-serif,system-ui,sans-serif">
-  <rect width="960" height="520" fill="#0d1117"/>
-  <text x="480" y="42" text-anchor="middle" fill="#e6edf3" font-size="24" font-weight="700">memcache</text>
-  <text x="480" y="68" text-anchor="middle" fill="#8b949e" font-size="13">flat · single-allocation · pointer-arithmetic</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 720" font-family="ui-sans-serif,system-ui,Segoe UI,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0e14"/>
+      <stop offset="100%" stop-color="#12181f"/>
+    </linearGradient>
+    <linearGradient id="barMem" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1a7f37"/>
+      <stop offset="100%" stop-color="#3fb950"/>
+    </linearGradient>
+    <linearGradient id="barWords" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6e40c9"/>
+      <stop offset="100%" stop-color="#a371f7"/>
+    </linearGradient>
+    <linearGradient id="barTags" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#b62324"/>
+      <stop offset="100%" stop-color="#f85149"/>
+    </linearGradient>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6Z" fill="#8b949e"/>
+    </marker>
+  </defs>
 
-  <!-- Single malloc block -->
-  <rect x="60" y="100" width="840" height="90" rx="12" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
-  <text x="480" y="130" text-anchor="middle" fill="#58a6ff" font-size="14" font-weight="600">ONE malloc</text>
-  <rect x="80" y="145" width="260" height="30" rx="6" fill="#21262d" stroke="#3fb950"/>
-  <text x="210" y="165" text-anchor="middle" fill="#e6edf3" font-size="12">backing store (mem)</text>
-  <rect x="350" y="145" width="260" height="30" rx="6" fill="#21262d" stroke="#a371f7"/>
-  <text x="480" y="165" text-anchor="middle" fill="#e6edf3" font-size="12">word slots (words)</text>
-  <rect x="620" y="145" width="260" height="30" rx="6" fill="#21262d" stroke="#e94560"/>
-  <text x="750" y="165" text-anchor="middle" fill="#e6edf3" font-size="12">tags (tags)</text>
+  <rect width="1100" height="720" fill="url(#bg)"/>
 
-  <!-- Access path -->
-  <rect x="60" y="220" width="280" height="120" rx="12" fill="#161b22" stroke="#30363d"/>
-  <text x="200" y="250" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600">Access</text>
-  <text x="80" y="280" fill="#8b949e" font-size="12">width in {1, 2, 4, 8}</text>
-  <text x="80" y="304" fill="#8b949e" font-size="12">addr + width within capacity</text>
-  <text x="80" y="328" fill="#e94560" font-size="12">else: reject, errors++</text>
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" fill="#f0f6fc" font-size="28" font-weight="700">memcache — system map</text>
+  <text x="550" y="66" text-anchor="middle" fill="#8b949e" font-size="14">one malloc · pointer arithmetic · direct-mapped · write-through · dual C / Wolfram</text>
 
-  <rect x="360" y="220" width="280" height="120" rx="12" fill="#161b22" stroke="#30363d"/>
-  <text x="500" y="250" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600">Direct-mapped slot</text>
-  <text x="380" y="280" fill="#8b949e" font-size="12">tag = addr >> 3</text>
-  <text x="380" y="304" fill="#8b949e" font-size="12">slot = tag & 4095</text>
-  <text x="380" y="328" fill="#8b949e" font-size="12">aligned 64-bit word</text>
+  <!-- ===== SINGLE ALLOCATION ===== -->
+  <rect x="40" y="90" width="1020" height="150" rx="14" fill="#161b22" stroke="#388bfd" stroke-width="2"/>
+  <text x="60" y="118" fill="#58a6ff" font-size="15" font-weight="700">SINGLE ALLOCATION  (cache_create)</text>
+  <text x="60" y="140" fill="#8b949e" font-size="12">Cache.mem points at the base. words and tags are offsets into the same block — no second malloc.</text>
 
-  <rect x="660" y="220" width="240" height="120" rx="12" fill="#161b22" stroke="#30363d"/>
-  <text x="780" y="250" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600">Policy</text>
-  <text x="680" y="280" fill="#3fb950" font-size="12">write-through</text>
-  <text x="680" y="304" fill="#3fb950" font-size="12">write-allocate</text>
-  <text x="680" y="328" fill="#8b949e" font-size="12">LE byte extract</text>
+  <!-- memory bar -->
+  <rect x="60" y="155" width="980" height="56" rx="8" fill="#0d1117" stroke="#30363d"/>
+  <rect x="64" y="159" width="420" height="48" rx="6" fill="url(#barMem)"/>
+  <text x="274" y="188" text-anchor="middle" fill="#0d1117" font-size="14" font-weight="700">mem[]  backing store</text>
+  <rect x="484" y="159" width="320" height="48" rx="6" fill="url(#barWords)"/>
+  <text x="644" y="188" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">words[4096]</text>
+  <rect x="804" y="159" width="232" height="48" rx="6" fill="url(#barTags)"/>
+  <text x="920" y="188" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">tags[4096]</text>
 
-  <!-- Dual model -->
-  <rect x="60" y="370" width="420" height="120" rx="12" fill="#161b22" stroke="#e94560" stroke-width="2"/>
-  <text x="270" y="400" text-anchor="middle" fill="#e94560" font-size="14" font-weight="600">C11 native</text>
-  <text x="80" y="430" fill="#8b949e" font-size="12">memcache.c · driver · replay</text>
-  <text x="80" y="454" fill="#8b949e" font-size="12">bounds · OOB · range_grid</text>
-  <text x="80" y="478" fill="#8b949e" font-size="12">ASan + UBSan</text>
+  <text x="64" y="230" fill="#3fb950" font-size="11">byte_at(c, addr) → mem + addr</text>
+  <text x="484" y="230" fill="#a371f7" font-size="11">word_at(c, idx) → words + idx</text>
+  <text x="804" y="230" fill="#f85149" font-size="11">tag = addr >> 3</text>
 
-  <rect x="500" y="370" width="400" height="120" rx="12" fill="#161b22" stroke="#a371f7" stroke-width="2"/>
-  <text x="700" y="400" text-anchor="middle" fill="#a371f7" font-size="14" font-weight="600">Wolfram reference</text>
-  <text x="520" y="430" fill="#8b949e" font-size="12">MemCache.wl model</text>
-  <text x="520" y="454" fill="#8b949e" font-size="12">differential A–E checks</text>
-  <text x="520" y="478" fill="#8b949e" font-size="12">9,909-row validity grid</text>
+  <!-- ===== SLOT GEOMETRY ===== -->
+  <rect x="40" y="260" width="520" height="200" rx="14" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="288" fill="#f0f6fc" font-size="15" font-weight="700">SLOT GEOMETRY</text>
+  <text x="60" y="312" fill="#8b949e" font-size="12">4096 direct-mapped slots · aligned 64-bit word per access address</text>
+
+  <!-- mini slot grid -->
+  <g transform="translate(60,330)">
+    <rect width="36" height="28" rx="3" fill="#21262d" stroke="#3fb950"/><text x="18" y="18" text-anchor="middle" fill="#3fb950" font-size="9">0</text>
+    <rect x="40" width="36" height="28" rx="3" fill="#21262d" stroke="#30363d"/><text x="58" y="18" text-anchor="middle" fill="#8b949e" font-size="9">1</text>
+    <rect x="80" width="36" height="28" rx="3" fill="#21262d" stroke="#30363d"/><text x="98" y="18" text-anchor="middle" fill="#8b949e" font-size="9">2</text>
+    <rect x="120" width="36" height="28" rx="3" fill="#21262d" stroke="#30363d"/><text x="138" y="18" text-anchor="middle" fill="#8b949e" font-size="9">3</text>
+    <rect x="160" width="36" height="28" rx="3" fill="#21262d" stroke="#a371f7"/><text x="178" y="18" text-anchor="middle" fill="#a371f7" font-size="9">…</text>
+    <rect x="200" width="50" height="28" rx="3" fill="#21262d" stroke="#e94560"/><text x="225" y="18" text-anchor="middle" fill="#e94560" font-size="9">4095</text>
+  </g>
+
+  <text x="60" y="390" fill="#e6edf3" font-size="13">tag  = addr >> 3</text>
+  <text x="60" y="412" fill="#e6edf3" font-size="13">slot = tag & (4096 − 1)   = tag & 0xFFF</text>
+  <text x="60" y="434" fill="#8b949e" font-size="12">load: extract width bytes (LE) from the cached word; cross-word from backing</text>
+  <text x="60" y="452" fill="#8b949e" font-size="12">store: write-through + write-allocate; refresh every touched word slot</text>
+
+  <!-- ===== ACCESS CONTRACT ===== -->
+  <rect x="580" y="260" width="480" height="200" rx="14" fill="#161b22" stroke="#30363d"/>
+  <text x="600" y="288" fill="#f0f6fc" font-size="15" font-weight="700">ACCESS CONTRACT</text>
+  <text x="600" y="316" fill="#8b949e" font-size="12">width ∈ {1, 2, 4, 8}</text>
+  <text x="600" y="340" fill="#58a6ff" font-size="13" font-family="ui-monospace,monospace">Valid(a,w,M) ⇔ 0 ≤ a ≤ M ∧ 0 < w ≤ M−a</text>
+
+  <rect x="600" y="360" width="200" height="70" rx="8" fill="#0d1117" stroke="#3fb950"/>
+  <text x="700" y="388" text-anchor="middle" fill="#3fb950" font-size="13" font-weight="600">ACCEPT</text>
+  <text x="700" y="410" text-anchor="middle" fill="#8b949e" font-size="11">hit/miss · load/store</text>
+
+  <rect x="820" y="360" width="200" height="70" rx="8" fill="#0d1117" stroke="#f85149"/>
+  <text x="920" y="388" text-anchor="middle" fill="#f85149" font-size="13" font-weight="600">REJECT</text>
+  <text x="920" y="410" text-anchor="middle" fill="#8b949e" font-size="11">load→0 · store no-op · errors++</text>
+
+  <!-- ===== DUAL STACK ===== -->
+  <rect x="40" y="480" width="500" height="210" rx="14" fill="#161b22" stroke="#f85149" stroke-width="2"/>
+  <text x="60" y="508" fill="#f85149" font-size="15" font-weight="700">C11 NATIVE  native/c/</text>
+  <text x="60" y="534" fill="#e6edf3" font-size="13">memcache.c / memcache.h</text>
+  <text x="60" y="556" fill="#8b949e" font-size="12">cache_create · cache_load · cache_store · cache_destroy</text>
+  <text x="60" y="578" fill="#8b949e" font-size="12">memcache_test.c — xorshift32 driver (seed-driven)</text>
+  <text x="60" y="600" fill="#8b949e" font-size="12">memcache_replay.c — export / final.bin</text>
+  <text x="60" y="622" fill="#8b949e" font-size="12">memcache_bounds_test.c · memcache_oob.c · range_grid.c</text>
+  <text x="60" y="648" fill="#3fb950" font-size="12">ASan + UBSan · 1580+ bound checks · clean</text>
+  <text x="60" y="672" fill="#8b949e" font-size="12">artifacts: hits · misses · errors</text>
+
+  <rect x="560" y="480" width="500" height="210" rx="14" fill="#161b22" stroke="#a371f7" stroke-width="2"/>
+  <text x="580" y="508" fill="#a371f7" font-size="15" font-weight="700">WOLFRAM REFERENCE  wolfram/</text>
+  <text x="580" y="534" fill="#e6edf3" font-size="13">MemCache.wl — formal model</text>
+  <text x="580" y="556" fill="#8b949e" font-size="12">CacheDifferential.wl + Diff A B C D E</text>
+  <text x="580" y="582" fill="#3fb950" font-size="12">A  PRNG stream          500 / 500</text>
+  <text x="580" y="604" fill="#3fb950" font-size="12">B  initial memory       1024 / 1024</text>
+  <text x="580" y="626" fill="#3fb950" font-size="12">C  load values          318 / 318</text>
+  <text x="580" y="648" fill="#3fb950" font-size="12">D  final memory         1024 / 1024</text>
+  <text x="580" y="670" fill="#3fb950" font-size="12">E  validity grid        9,909 rows · 0 disagreements</text>
 </svg>
