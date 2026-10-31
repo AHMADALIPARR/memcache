@@ -5,7 +5,7 @@
 Owners: Nova Parr, Ahmad Ali Parr, and Team HoloTwinKitty.  
 Trademark: watermarks and holographic images on every repo.
 
-A byte-addressable memory cache in C11 with a Wolfram Language reference model and a differential test harness. One `malloc` backs the whole cache: backing store, word slots, and tags are carved out of a single allocation by pointer arithmetic.
+A byte-addressable memory cache in C11 with a Wolfram Language reference model and a differential test harness. One malloc backs the whole cache: backing store, word slots, and tags are carved out of a single allocation by pointer arithmetic.
 
 ---
 
@@ -13,39 +13,39 @@ A byte-addressable memory cache in C11 with a Wolfram Language reference model a
 
 ```mermaid
 flowchart TB
-    subgraph ALLOC["ONE malloc — cache_create"]
+    subgraph ALLOC[ONE malloc cache_create]
         direction LR
-        MEM["mem[] backing store"]
-        WORDS["words 4096 slots"]
-        TAGS["tags 4096"]
+        MEM[mem backing store]
+        WORDS[words 4096 slots]
+        TAGS[tags 4096]
         MEM --- WORDS --- TAGS
     end
 
-    subgraph ACCESS["Access path"]
-        IN["addr, width"] --> VALID{"range_valid?\nwidth in 1,2,4,8\naddr+width in bounds"}
-        VALID -->|no| REJ["reject\nload=0 / store no-op\nerrors++"]
-        VALID -->|yes| SLOT["tag = addr >> 3\nslot = tag and 0xFFF"]
-        SLOT --> OP["load: LE extract\nstore: write-through + allocate"]
+    subgraph ACCESS[Access path]
+        IN[addr and width] --> VALID{range_valid}
+        VALID -->|no| REJ[reject errors plus one]
+        VALID -->|yes| SLOT[tag and slot index]
+        SLOT --> OP[load extract or store write-through]
         OP --> ALLOC
     end
 
-    subgraph NATIVE["C11 native/c"]
-        CORE["memcache.c / .h"]
-        DRV["test · replay · bounds · oob · grid"]
+    subgraph NATIVE[C11 native/c]
+        CORE[memcache.c and header]
+        DRV[test replay bounds oob grid]
         CORE --> DRV
     end
 
-    subgraph WL["Wolfram wolfram/"]
-        MODEL["MemCache.wl"]
-        DIFF["Diff A–E\n500 ops · 318 loads\n9,909 grid rows"]
+    subgraph WL[Wolfram wolfram]
+        MODEL[MemCache.wl]
+        DIFF[Diff A through E]
         MODEL --> DIFF
     end
 
-    DRV --> RUN2["run2 artifacts"]
+    DRV --> RUN2[run2 artifacts]
     RUN2 --> DIFF
 ```
 
-**SVG assets** (open in browser if the diagram above is enough):
+SVG assets:
 
 - [system-map.svg](docs/images/system-map.svg)
 - [data-path.svg](docs/images/data-path.svg)
@@ -56,11 +56,11 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    IN["addr, width"] --> V{"range_valid?"}
-    V -->|no| ERR["return 0 / no-op\nerrors++"]
-    V -->|yes| SLOT["tag = addr >> 3\nslot = tag and 4095"]
-    SLOT --> OP["load extract / store write-through"]
-    OP --> MEM["backing store + slots"]
+    IN[addr and width] --> V{range_valid}
+    V -->|no| ERR[reject errors plus one]
+    V -->|yes| SLOT[tag and slot]
+    SLOT --> OP[load extract or store write-through]
+    OP --> MEM[backing store and slots]
 ```
 
 ---
@@ -79,15 +79,9 @@ An access is valid iff width is in `{1, 2, 4, 8}` and:
 addr <= capacity  and  width <= capacity - addr
 ```
 
-Invalid load returns `0`; invalid store writes nothing. Both increment `errors` (independent status channel so a rejected load is distinct from a valid zero).
+Invalid load returns `0`; invalid store writes nothing. Both increment `errors`.
 
-Same predicate on the Wolfram side:
-
-```text
-Valid(a, w, M)  iff  0 ≤ a ≤ M  and  0 < w ≤ M − a
-```
-
-Equivalence is checked over a **9,909-row** dumped grid.
+Same predicate on the Wolfram side, checked over a **9,909-row** grid.
 
 ---
 
@@ -95,30 +89,30 @@ Equivalence is checked over a **9,909-row** dumped grid.
 
 | Path | Role |
 | --- | --- |
-| `native/c/` | Cache core, driver, replay, bounds/OOB tests, range grid |
-| `native/c/baseline/` | Pre-contract evidence: hashes, seed-20261031 transcript |
-| `native/c/run2/` | Current artifacts: mem image, trace, results, final.bin, grid |
-| `wolfram/` | Reference model + differential runners A–E |
-| `docs/images/` | SVG architecture assets |
+| native/c/ | Cache core, driver, replay, bounds/OOB tests, range grid |
+| native/c/baseline/ | Pre-contract evidence: hashes, seed-20261031 transcript |
+| native/c/run2/ | Current artifacts: mem image, trace, results, final.bin, grid |
+| wolfram/ | Reference model and differential runners A through E |
+| docs/images/ | SVG architecture assets |
 
 ```mermaid
 flowchart TB
-    subgraph Native["native/c"]
-        CORE["memcache.c / .h"]
-        DRV["memcache_test.c"]
-        REP["memcache_replay.c"]
-        BND["bounds + oob tests"]
-        GRID["range_grid.c"]
+    subgraph Native[native/c]
+        CORE[memcache.c]
+        DRV[memcache_test.c]
+        REP[memcache_replay.c]
+        BND[bounds and oob tests]
+        GRID[range_grid.c]
     end
 
-    subgraph Evidence["Evidence"]
-        BASE["baseline/"]
-        RUN2["run2/"]
+    subgraph Evidence[Evidence]
+        BASE[baseline]
+        RUN2[run2]
     end
 
-    subgraph WLsub["wolfram/"]
-        MODEL["MemCache.wl"]
-        DIFF["CacheDifferential + Diff A–E"]
+    subgraph WLsub[wolfram]
+        MODEL[MemCache.wl]
+        DIFF[CacheDifferential]
     end
 
     CORE --> DRV
@@ -136,17 +130,17 @@ flowchart TB
 
 | Symbol | Meaning |
 | --- | --- |
-| `cache_create(memBytes)` | One allocation; carve mem / words / tags |
-| `cache_load(c, addr, width)` | Tagged load; 0 + `errors++` if invalid |
-| `cache_store(c, addr, width, val)` | Write-through store; no-op if invalid |
-| `cache_destroy(c)` | Free the single block |
-| `byte_at` / `word_at` | Pointer arithmetic into the flat region |
+| cache_create | One allocation; carve mem, words, tags |
+| cache_load | Tagged load; 0 and errors++ if invalid |
+| cache_store | Write-through store; no-op if invalid |
+| cache_destroy | Free the single block |
+| byte_at / word_at | Pointer arithmetic into the flat region |
 
-Counters on `Cache`: `hits`, `misses`, `errors`.
+Counters on Cache: hits, misses, errors.
 
 ---
 
-## Differential checks (run2)
+## Differential checks run2
 
 | Check | What | Result |
 | --- | --- | --- |
@@ -154,9 +148,9 @@ Counters on `Cache`: `hits`, `misses`, `errors`.
 | B | Initial memory image | 1024/1024 |
 | C | Load values by sequence | 318/318 |
 | D | Final memory image | 1024/1024 |
-| E | Validity grid C vs Wolfram | 9,909 rows, 0 disagreements |
+| E | Validity grid C vs Wolfram | 9909 rows, 0 disagreements |
 
-Baseline seed `20261031`: 500 ops, 318 loads, 182 stores.
+Baseline seed 20261031: 500 ops, 318 loads, 182 stores.
 
 ---
 
@@ -164,12 +158,12 @@ Baseline seed `20261031`: 500 ops, 318 loads, 182 stores.
 
 ```sh
 cd native/c
-make                                    # clang, ASan + UBSan
+make
 ./memcache_test 20261031 run2/mem.bin run2/trace.jsonl run2/results.jsonl
 
 clang -O1 -g -Wall -Wextra -fsanitize=address,undefined \
   -fno-sanitize-recover=all -o memcache_bounds_test memcache_bounds_test.c
-./memcache_bounds_test                  # 1580+ checks
+./memcache_bounds_test
 
 clang -O1 -g -Wall -Wextra -fsanitize=address,undefined \
   -fno-sanitize-recover=all -o memcache_replay memcache.c memcache_replay.c
@@ -177,10 +171,10 @@ clang -O1 -g -Wall -Wextra -fsanitize=address,undefined \
   run2/results_replay.jsonl run2/final.bin
 ```
 
-See `STATUS.md` for gate results and provenance notes.
+See STATUS.md for gate results and provenance notes.
 
 ---
 
 ## License
 
-See `LICENSE`. Commercial exploitation requires separate written authorization from the owners; publication, access, download, or possession is not that authorization.
+See LICENSE. Commercial exploitation requires separate written authorization from the owners; publication, access, download, or possession is not that authorization.
