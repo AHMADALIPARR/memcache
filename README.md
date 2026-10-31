@@ -1,54 +1,129 @@
-# memcache — flat, single-allocation, pointer-arithmetic cache
+# memcache
 
-**Owners: Nova Parr, Ahmad Ali Parr, and Team HoloTwinKitty.**
-**Our trademark is our watermarks and holographic images we drop on every repo.**
+**Flat, single-allocation, pointer-arithmetic cache**
 
-A byte-addressable memory cache in C11 with a Wolfram Language reference
-model and a differential test harness. One malloc backs the whole cache:
-backing store, word slots, and tags are carved out of a single allocation
-by pointer arithmetic.
+Owners: Nova Parr, Ahmad Ali Parr, and Team HoloTwinKitty.  
+Trademark: watermarks and holographic images on every repo.
+
+A byte-addressable memory cache in C11 with a Wolfram Language reference model and a differential test harness. One `malloc` backs the whole cache: backing store, word slots, and tags are carved out of a single allocation by pointer arithmetic.
+
+---
+
+## System map
+
+![memcache system map](docs/images/system-map.svg)
+
+---
+
+## Data path
+
+![Load and store data path](docs/images/data-path.svg)
+
+```mermaid
+flowchart LR
+    IN["addr, width"] --> V{"range_valid?"}
+    V -->|no| ERR["return 0 / no-op\nerrors++"]
+    V -->|yes| SLOT["tag = addr >> 3\nslot = tag & 4095"]
+    SLOT --> OP["load extract / store write-through"]
+    OP --> MEM["backing store + slots"]
+```
+
+---
 
 ## Model
 
-- Width-tagged accesses of 1, 2, 4, or 8 bytes, little-endian.
-- Direct-mapped slots, 4096 of them. A slot holds the aligned 64-bit word
-  containing the address (`tag = addr >> 3`, `slot = tag & (slots - 1)`);
-  a load extracts the requested bytes from that word, including accesses
-  that cross a word boundary.
-- Stores are write-through and write-allocate.
+- Width-tagged accesses of **1, 2, 4, or 8** bytes, little-endian.
+- **4096** direct-mapped slots. A slot holds the aligned 64-bit word for the address (`tag = addr >> 3`, `slot = tag & 4095`). Loads extract the requested bytes from that word, including accesses that cross a word boundary.
+- Stores are **write-through** and **write-allocate**.
 
-## Access contract
+### Access contract
 
-An access is valid if and only if the width is in {1, 2, 4, 8} and
-`addr <= capacity` and `width <= capacity - addr` (overflow-safe form).
-An invalid load returns 0 and an invalid store writes nothing; both
-increment the cache's `errors` counter, which is the independent status
-channel that distinguishes a rejected load from a load whose valid
-value is 0.
+An access is valid iff width is in `{1, 2, 4, 8}` and:
 
-The same predicate is the formal invariant of the Wolfram model,
-`Valid(a, w, M) ⟺ 0 ≤ a ≤ M ∧ 0 < w ≤ M − a`, and the two are tested for
-equivalence over a dumped grid (9,909 rows).
+```text
+addr <= capacity  and  width <= capacity - addr
+```
+
+Invalid load returns `0`; invalid store writes nothing. Both increment `errors` (independent status channel so a rejected load is distinct from a valid zero).
+
+Same predicate on the Wolfram side:
+
+```text
+Valid(a, w, M)  iff  0 ≤ a ≤ M  and  0 < w ≤ M − a
+```
+
+Equivalence is checked over a **9,909-row** dumped grid.
+
+---
 
 ## Layout
 
-- `native/c/` — the cache (`memcache.c`), the deterministic driver
-  (`memcache_test.c`, xorshift32, seed-driven), the replay/export tool
-  (`memcache_replay.c`), the boundary and contract tests
-  (`memcache_bounds_test.c`, `memcache_oob.c`), and the range-grid
-  dumper (`range_grid.c`).
-- `native/c/baseline/` — the pre-contract execution evidence: source
-  and binary SHA-256 hashes, the seed-20261031 transcript
-  (500 ops, 318 loads, 182 stores), and the captured artifacts.
-- `native/c/run2/` — the current execution artifacts: memory image,
-  trace, driver and replay results, the exported final memory image,
-  and the range grid.
-- `wolfram/` — the reference model (`MemCache.wl`), the differential
-  runner (`CacheDifferential.wl`, `CacheDiffAB.wl`, `CacheDiffCD.wl`,
-  `CacheDiffE.wl`), and the supplied verification tests
-  (`MemCacheTests.wlt`). The Wolfram side regenerates the full PRNG
-  stream, replays all 500 operations, compares all 318 load values by
-  sequence number, and compares the final memory image byte for byte.
+| Path | Role |
+| --- | --- |
+| `native/c/` | Cache core, driver, replay, bounds/OOB tests, range grid |
+| `native/c/baseline/` | Pre-contract evidence: hashes, seed-20261031 transcript |
+| `native/c/run2/` | Current artifacts: mem image, trace, results, final.bin, grid |
+| `wolfram/` | Reference model + differential runners A–E |
+| `docs/images/` | Architecture visuals |
+
+```mermaid
+flowchart TB
+    subgraph Native["native/c"]
+        CORE["memcache.c / .h"]
+        DRV["memcache_test.c"]
+        REP["memcache_replay.c"]
+        BND["bounds + oob tests"]
+        GRID["range_grid.c"]
+    end
+
+    subgraph Evidence["Evidence"]
+        BASE["baseline/"]
+        RUN2["run2/"]
+    end
+
+    subgraph WL["wolfram/"]
+        MODEL["MemCache.wl"]
+        DIFF["CacheDifferential + Diff A–E"]
+    end
+
+    CORE --> DRV
+    CORE --> REP
+    DRV --> RUN2
+    REP --> RUN2
+    GRID --> RUN2
+    RUN2 --> DIFF
+    MODEL --> DIFF
+```
+
+---
+
+## API surface
+
+| Symbol | Meaning |
+| --- | --- |
+| `cache_create(memBytes)` | One allocation; carve mem / words / tags |
+| `cache_load(c, addr, width)` | Tagged load; 0 + `errors++` if invalid |
+| `cache_store(c, addr, width, val)` | Write-through store; no-op if invalid |
+| `cache_destroy(c)` | Free the single block |
+| `byte_at` / `word_at` | Pointer arithmetic into the flat region |
+
+Counters on `Cache`: `hits`, `misses`, `errors`.
+
+---
+
+## Differential checks (run2)
+
+| Check | What | Result |
+| --- | --- | --- |
+| A | PRNG stream vs Wolfram | 500/500 |
+| B | Initial memory image | 1024/1024 |
+| C | Load values by sequence | 318/318 |
+| D | Final memory image | 1024/1024 |
+| E | Validity grid C vs Wolfram | 9,909 rows, 0 disagreements |
+
+Baseline seed `20261031`: 500 ops, 318 loads, 182 stores.
+
+---
 
 ## Build and verify
 
@@ -59,7 +134,7 @@ make                                    # clang, ASan + UBSan
 
 clang -O1 -g -Wall -Wextra -fsanitize=address,undefined \
   -fno-sanitize-recover=all -o memcache_bounds_test memcache_bounds_test.c
-./memcache_bounds_test                  # 1580 checks
+./memcache_bounds_test                  # 1580+ checks
 
 clang -O1 -g -Wall -Wextra -fsanitize=address,undefined \
   -fno-sanitize-recover=all -o memcache_replay memcache.c memcache_replay.c
@@ -67,8 +142,10 @@ clang -O1 -g -Wall -Wextra -fsanitize=address,undefined \
   run2/results_replay.jsonl run2/final.bin
 ```
 
+See `STATUS.md` for gate results and provenance notes.
+
+---
+
 ## License
 
-See `LICENSE`. Commercial exploitation requires separate written
-authorization from the owners; publication, access, download, or
-possession is not that authorization.
+See `LICENSE`. Commercial exploitation requires separate written authorization from the owners; publication, access, download, or possession is not that authorization.
