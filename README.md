@@ -11,19 +11,54 @@ A byte-addressable memory cache in C11 with a Wolfram Language reference model a
 
 ## System map
 
-![memcache system map](https://raw.githubusercontent.com/AHMADALIPARR/memcache/main/docs/images/system-map.svg)
+```mermaid
+flowchart TB
+    subgraph ALLOC["ONE malloc — cache_create"]
+        direction LR
+        MEM["mem[] backing store"]
+        WORDS["words 4096 slots"]
+        TAGS["tags 4096"]
+        MEM --- WORDS --- TAGS
+    end
+
+    subgraph ACCESS["Access path"]
+        IN["addr, width"] --> VALID{"range_valid?\nwidth in 1,2,4,8\naddr+width in bounds"}
+        VALID -->|no| REJ["reject\nload=0 / store no-op\nerrors++"]
+        VALID -->|yes| SLOT["tag = addr >> 3\nslot = tag and 0xFFF"]
+        SLOT --> OP["load: LE extract\nstore: write-through + allocate"]
+        OP --> ALLOC
+    end
+
+    subgraph NATIVE["C11 native/c"]
+        CORE["memcache.c / .h"]
+        DRV["test · replay · bounds · oob · grid"]
+        CORE --> DRV
+    end
+
+    subgraph WL["Wolfram wolfram/"]
+        MODEL["MemCache.wl"]
+        DIFF["Diff A–E\n500 ops · 318 loads\n9,909 grid rows"]
+        MODEL --> DIFF
+    end
+
+    DRV --> RUN2["run2 artifacts"]
+    RUN2 --> DIFF
+```
+
+**SVG assets** (open in browser if the diagram above is enough):
+
+- [system-map.svg](docs/images/system-map.svg)
+- [data-path.svg](docs/images/data-path.svg)
 
 ---
 
 ## Data path
 
-![Load and store data path](https://raw.githubusercontent.com/AHMADALIPARR/memcache/main/docs/images/data-path.svg)
-
 ```mermaid
 flowchart LR
     IN["addr, width"] --> V{"range_valid?"}
     V -->|no| ERR["return 0 / no-op\nerrors++"]
-    V -->|yes| SLOT["tag = addr >> 3\nslot = tag & 4095"]
+    V -->|yes| SLOT["tag = addr >> 3\nslot = tag and 4095"]
     SLOT --> OP["load extract / store write-through"]
     OP --> MEM["backing store + slots"]
 ```
@@ -64,7 +99,7 @@ Equivalence is checked over a **9,909-row** dumped grid.
 | `native/c/baseline/` | Pre-contract evidence: hashes, seed-20261031 transcript |
 | `native/c/run2/` | Current artifacts: mem image, trace, results, final.bin, grid |
 | `wolfram/` | Reference model + differential runners A–E |
-| `docs/images/` | Architecture visuals |
+| `docs/images/` | SVG architecture assets |
 
 ```mermaid
 flowchart TB
@@ -81,7 +116,7 @@ flowchart TB
         RUN2["run2/"]
     end
 
-    subgraph WL["wolfram/"]
+    subgraph WLsub["wolfram/"]
         MODEL["MemCache.wl"]
         DIFF["CacheDifferential + Diff A–E"]
     end
